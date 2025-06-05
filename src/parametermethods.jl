@@ -24,7 +24,9 @@ Extract specific parameters from fitted model as DimArray.
 function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
     new_names = string.(parameter_names(TM, params)) # string to allow regex lookup
-    arr = DimArray(TM.samples[params].value, (Dim{:draw}, Dim{:param}(new_names), Dim{:chain}))
+    arr = DimArray(
+        TM.samples[params].value, (Dim{:draw}, Dim{:param}(new_names), Dim{:chain})
+    )
     params = process_draws(arr; kwargs...)
 end
 
@@ -39,9 +41,9 @@ Get all model parameters.
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function parameters(TM::TuringGLMModel, fun::Union{Nothing, Function}=nothing; kwargs...)
+function parameters(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
     params = get_parameters(TM, TM.samples.name_map[:parameters]; kwargs...)
-    params = isnothing(fun) ? params : mapslices(fun, params; dims = 1) 
+    params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
     return drop_single_dims(params)
 end
 
@@ -56,10 +58,10 @@ Get fixed effect coefficients (β parameters).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)  
 - `collapse`: Whether to collapse chains into single dimension
 """
-function fixef(TM::TuringGLMModel, fun::Union{Nothing, Function}=nothing; kwargs...)
+function fixef(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
     fixef_names = [Symbol("β[$i]") for i in 1:size(TM.X, 2)]
     params = get_parameters(TM, fixef_names; kwargs...)
-    params = isnothing(fun) ? params : mapslices(fun, params; dims = 1) 
+    params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
     return drop_single_dims(params)
 end
 
@@ -74,10 +76,10 @@ Get internal parameters (auxiliary parameters like σ, ν, etc).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function internals(TM::TuringGLMModel, fun::Union{Nothing, Function}=nothing; kwargs...)
+function internals(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
     internals_names = TM.samples.name_map[:internals]
     params = get_parameters(TM, internals_names; kwargs...)
-    params = isnothing(fun) ? params : mapslices(fun, params; dims = 1) 
+    params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
     return drop_single_dims(params)
 end
 

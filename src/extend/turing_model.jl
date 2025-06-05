@@ -1,5 +1,4 @@
 
-
 """
     turing_glm(formula::FormulaTerm, data, T; priors=DefaultPrior(), standardize=false)
     turing_glm(y::AbstractVector, X::AbstractArray, T; names=Symbol[], kwargs...)
@@ -26,7 +25,6 @@ function turing_glm(
     priors::Prior=DefaultPrior(),
     standardize::Bool=false,
 ) where {T<:UnivariateDistribution}
-
     standardize && @warn "The TuringArm Model object will contain standardized data."
     # Get what we need
     y = TuringGLM.data_response(formula, data)
@@ -51,16 +49,19 @@ function turing_glm(
 end
 
 ## Method for y and X
-function turing_glm(y::AbstractVector, X::AbstractArray, ::Type{T}; names::Vector{Symbol}=Symbol[], kwargs...) where {T<:UnivariateDistribution}
+function turing_glm(
+    y::AbstractVector,
+    X::AbstractArray,
+    ::Type{T};
+    names::Vector{Symbol}=Symbol[],
+    kwargs...,
+) where {T<:UnivariateDistribution}
     if isempty(names)
         X_names = ntuple(i -> Symbol("X$i"), size(X, 2))
     else
         X_names = ntuple(i -> Symbol(names[i]), length(names))
     end
-    table = (;
-        NamedTuple{X_names}(eachcol(X))...,
-        NamedTuple{(:y,)}([y])...
-    )
+    table = (; NamedTuple{X_names}(eachcol(X))..., NamedTuple{(:y,)}([y])...)
     #TODO improve
     formula = "y ~ " * join([string.(term) for term in X_names], " + ")
     formula_obj = eval(Meta.parse("@formula($formula)"))

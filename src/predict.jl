@@ -10,7 +10,13 @@ Generate predictions for new data or fitted data.
 - `fun`: Optional function to apply across draws
 - `type`: Type of prediction (:posterior, :epred, :linpred)
 """
-function predict(TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing, Function}=nothing; type::Symbol = :posterior, kwargs...)
+function predict(
+    TM::TuringGLMModel,
+    X::AbstractArray,
+    fun::Union{Nothing,Function}=nothing;
+    type::Symbol=:posterior,
+    kwargs...,
+)
     #TODO handle Z
     if type === :posterior
         return posterior_pred(TM, X, fun; kwargs...)
@@ -23,7 +29,7 @@ function predict(TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing, Funct
     end
 end
 
-function predict(TM::TuringGLMModel, fun::Union{Nothing, Function}=nothing; kwargs...)
+function predict(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
     #TODO handle Z
     return predict(TM, TM.X, fun; kwargs...)
 end
@@ -40,18 +46,24 @@ Generate linear predictor values (α + Xβ).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function linpred(TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing, Function}=nothing; kwargs...)
+function linpred(
+    TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+)
     #standardize? - check here since this is the 'base' method for all predictions
-    TM.standardized && (X !== TM.X) && @warn "Standardization not applied to new data when predicting."
+    TM.standardized &&
+        (X !== TM.X) &&
+        @warn "Standardization not applied to new data when predicting."
 
     α = get_parameters(TM, [:α]; kwargs...) # vec required for NamedArray problems below
     β = fixef(TM; kwargs...)
     # handle 3d
-    μ = zeros(eltype(α), (Dim{:row}(size(X, 1)), Dim{:draw}(size(α, 1)), Dim{:chain}(size(α, 3))))
+    μ = zeros(
+        eltype(α), (Dim{:row}(size(X, 1)), Dim{:draw}(size(α, 1)), Dim{:chain}(size(α, 3)))
+    )
     for i in 1:size(μ, 3)
         μ[:, :, i] = vec(α[:, :, i])' .+ X * β[:, :, i]'
     end
-    μ = isnothing(fun) ? μ : mapslices(fun, μ; dims = 2) 
+    μ = isnothing(fun) ? μ : mapslices(fun, μ; dims=2)
     return drop_single_dims(μ)
 end
 
@@ -67,9 +79,11 @@ Generate expected predictions (inverse link of linear predictor).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function epred(TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing, Function}=nothing; kwargs...) where T
+function epred(
+    TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+) where {T}
     μ = linpred(TM, X; kwargs...) # don't pass fun
-    invlink = let 
+    invlink = let
         if TM.link == identity
             identity
         elseif TM.link == logit
@@ -79,7 +93,7 @@ function epred(TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing, Func
         end
     end
     epreds = invlink.(μ)
-    epreds = isnothing(fun) ? epreds : mapslices(fun, epreds; dims = 2) 
+    epreds = isnothing(fun) ? epreds : mapslices(fun, epreds; dims=2)
     return drop_single_dims(epreds)
 end
 
@@ -95,7 +109,9 @@ Generate posterior predictive samples (includes observation noise).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function posterior_pred(TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing, Function}=nothing; kwargs...) where T
+function posterior_pred(
+    TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+) where {T}
     epreds = epred(TM, X; kwargs...) #don't pass fun
     ndraws = size(epreds, 2)
     if T == Normal
@@ -113,6 +129,7 @@ function posterior_pred(TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Noth
         ϕ⁻ = vec(get_parameters(TM, [:ϕ⁻]; kwargs...))
         posterior_preds = rand.(TuringGLM.NegativeBinomial2.(epreds, ϕ⁻'))
     end
-    posterior_preds = isnothing(fun) ? posterior_preds : mapslices(fun, posterior_preds; dims = 2) 
+    posterior_preds =
+        isnothing(fun) ? posterior_preds : mapslices(fun, posterior_preds; dims=2)
     return drop_single_dims(posterior_preds)
 end

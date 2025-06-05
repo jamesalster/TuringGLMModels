@@ -4,18 +4,18 @@
 
 Bayesian regression model container that holds the formula, data, priors, and fitted samples.
 """
-mutable struct TuringGLMModel{T<:UnivariateDistribution} 
+mutable struct TuringGLMModel{T<:UnivariateDistribution}
     formula::FormulaTerm
     model::Model
     prior::CustomPrior
     link::Function
     y::AbstractVector
     X::AbstractMatrix
-    Z::Union{Nothing, Matrix}
+    Z::Union{Nothing,Matrix}
     X_names::Tuple
     Z_names::Tuple
     standardized::Bool
-    samples::Union{Nothing, Chains}
+    samples::Union{Nothing,Chains}
 end
 
 # Constructor with names, used in _extended_turing_model()
@@ -26,34 +26,44 @@ function TuringGLMModel(
     prior::CustomPrior,
     y::AbstractVector,
     X::AbstractMatrix,
-    Z::Union{Nothing, Matrix},
-    standardized::Bool
+    Z::Union{Nothing,Matrix},
+    standardized::Bool,
 ) where {T<:UnivariateDistribution}
     init_X_names = Symbol.(formula.rhs)
     init_Z_names = isnothing(Z) ? () : throw(ArgumentError("Z not yest supported"))
     link = get_link(T)
     return TuringGLMModel{T}(
-        formula, model, prior, link, y, X, Z, init_X_names, init_Z_names, standardized, nothing
+        formula,
+        model,
+        prior,
+        link,
+        y,
+        X,
+        Z,
+        init_X_names,
+        init_Z_names,
+        standardized,
+        nothing,
     )
 end
 
-function Base.show(io::IO, TM::TuringGLMModel{T}; warnings=true) where T
+function Base.show(io::IO, TM::TuringGLMModel{T}; warnings=true) where {T}
     # Define styles once at the top
     header_style = crayon"bold underline"
     label_style = crayon"bold !underline"
     normal_style = crayon"reset"  # or just use no crayon
-    
+
     println(io, header_style, "TuringGLM Model")
-    
+
     # Family
     print(io, label_style, "Family: ")
     family_string = "$T (link: $(string(TM.link)))"
     println(io, normal_style, family_string)
-    
+
     # Formula  
     print(io, label_style, "Formula: ")
     println(io, normal_style, string(TM.formula))
-    
+
     # Prior
     println(io, label_style, "Prior:")
     pr = TM.prior
@@ -61,12 +71,12 @@ function Base.show(io::IO, TM::TuringGLMModel{T}; warnings=true) where T
     println(io, normal_style, clean_prior_string(string(pr.predictors)))
     print(io, normal_style, "  Intercept: ")
     println(io, normal_style, clean_prior_string(string(pr.intercept)))
-    
+
     if !isnothing(pr.auxiliary)
         print(io, normal_style, "  Auxiliary: ")
         println(io, normal_style, clean_prior_string(string(pr.auxiliary)))
     end
-    
+
     # Observations
     print(io, label_style, "Observations: ")
     if TM.standardized
@@ -74,7 +84,7 @@ function Base.show(io::IO, TM::TuringGLMModel{T}; warnings=true) where T
     else
         println(io, normal_style, size(TM.X, 1))
     end
-    
+
     # Samples
     print(io, label_style, "Samples: ")
     if isnothing(TM.samples)
@@ -112,7 +122,7 @@ function fit!(
     N=2000,
     nchains=4,
     quiet=true,
-    kwargs...
+    kwargs...,
 )
     if quiet
         TM.samples = @suppress sample(TM.model, sampler, parallel, N, nchains; kwargs...)

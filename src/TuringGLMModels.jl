@@ -19,8 +19,7 @@ include("extend/turing_model.jl")
 include("pretty.jl")
 include("comparison.jl")
 
-export
-    TuringGLMModel,
+export TuringGLMModel,
     turing_glm,
     fit!,
     pretty,
