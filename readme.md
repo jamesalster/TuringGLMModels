@@ -3,6 +3,8 @@
 
 A simple wrapper around [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/stable/) for Bayesian regression.
 
+Uses DimArrays for outputs, allowing easy indexing.
+
 ## Installation
 
 ```julia
@@ -32,10 +34,14 @@ fit!(mod, N=1000, nchains=2)
 pretty(mod)
 
 # Get coefficients
-fixef(mod)  # With uncertainty
+fixed_effects = fixef(mod)  # With uncertainty
 coefs(mod)  # Point estimates, equivalent to fixef(mod,  median)
 fixef(mod, std) # Reduce to point estimate with passed function
 fixef(mod, x -> quantile(x, [0.05, 0.95])) # Reduce with custom function
+
+# Use the power of DimensionalData's orderless indexing
+fixed_effects[param=At("Cyl")]
+parameters(mod, collapse=false)[chain=2:3, param=Where(x -> occursin(r"yl", x))]
 
 # Extract parameters with options
 parameters(mod, drop_warmup=100, n_draws=500, collapse=false)
@@ -98,7 +104,7 @@ Parameter extraction functions accept:
 
 ## Thanks
 
-This package simply wraps [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/stable/) with a streamlined interface. Turing and TuringGLM do all the heavy lifting.
+This package simply wraps [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/stable/) with a streamlined interface. Turing and TuringGLM do all the heavy lifting. It also uses the power of [DimensionalData.jl](https://rafaqz.github.io/DimensionalData.jl/stable/) for its outputs.
 
 ## TODO
 

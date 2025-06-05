@@ -47,8 +47,7 @@ function linpred(TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing, Funct
     α = get_parameters(TM, [:α]; kwargs...) # vec required for NamedArray problems below
     β = fixef(TM; kwargs...)
     # handle 3d
-    μ = NamedArray(zeros(eltype(α), size(X, 1), size(α, 1), size(α, 3)))
-    setdimnames!(μ, [:row, :draw, :chain])
+    μ = zeros(eltype(α), (Dim{:row}(size(X, 1)), Dim{:draw}(size(α, 1)), Dim{:chain}(size(α, 3))))
     for i in 1:size(μ, 3)
         μ[:, :, i] = vec(α[:, :, i])' .+ X * β[:, :, i]'
     end

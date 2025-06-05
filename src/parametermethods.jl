@@ -13,7 +13,7 @@ end
 """
     get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
 
-Extract specific parameters from fitted model as NamedArray.
+Extract specific parameters from fitted model as DimArray.
 
 # Arguments
 - `params`: Vector of parameter symbols to extract
@@ -21,12 +21,10 @@ Extract specific parameters from fitted model as NamedArray.
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)
+function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
-    new_names = parameter_names(TM, params)
-    arr = NamedArray(TM.samples[params].value)
-    setnames!(arr, new_names, 2)
-    setdimnames!(arr, :draw, 1)
+    new_names = string.(parameter_names(TM, params)) # string to allow regex lookup
+    arr = DimArray(TM.samples[params].value, (Dim{:draw}, Dim{:param}(new_names), Dim{:chain}))
     params = process_draws(arr; kwargs...)
 end
 
@@ -99,8 +97,8 @@ end
 """
     outcome(TM::TuringGLMModel)
 
-Get the response variable as NamedArray.
+Get the response variable as DimArray.
 """
 function outcome(TM::TuringGLMModel)
-    return NamedArray(TM.y; names = (1:length(TM.y),), dimnames = (:row,))
+    return DimArray(TM.y, (Dim{:outcome}))
 end

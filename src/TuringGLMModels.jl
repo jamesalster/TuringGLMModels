@@ -3,7 +3,7 @@ module TuringGLMModels
 
 using Reexport
 @reexport using TuringGLM
-@reexport using NamedArrays
+@reexport using DimensionalData
 @reexport using LogExpFunctions: logit, logistic
 using PrettyTables
 using GLM: FormulaTerm

@@ -1,15 +1,15 @@
 name = "TuringGLMModels"
 uuid = "05562f13-f1cd-4651-9224-340edb91df25"
 authors = ["James Alster <jamesalster2@gmail.com"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
+DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
 LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
-NamedArrays = "86f7a689-2022-50b4-a561-43c23ac3c673"
 ParetoSmooth = "a68b5a21-f429-434e-8bfa-46b447300aac"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
@@ -19,11 +19,11 @@ TuringGLM = "0004c1f4-53c5-4d43-a221-a1dac6cf6b74"
 
 [compat]
 AbstractMCMC = "5.6.2"
+DimensionalData = "0.29.17"
 DynamicPPL = "0.34.2"
 GLM = "1.9.0"
 LogExpFunctions = "0.3.29"
 MCMCChains = "6.0.7"
-NamedArrays = "0.10.4"
 ParetoSmooth = "0.7.15"
 PrettyTables = "2.4.0"
 StatsModels = "0.7.4"

@@ -96,6 +96,7 @@ end
     fit!(TM::TuringGLMModel; sampler=NUTS(), parallel=MCMCThreads(), N=2000, nchains=4, quiet=true, kwargs...)
 
 Fit the model using MCMC sampling. Updates the model in-place with results.
+    Kwargs are passed to Turing's `sample()` function.
 
 # Arguments
 - `sampler`: MCMC sampler (default: NUTS())
