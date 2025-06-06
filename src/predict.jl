@@ -23,7 +23,7 @@ function predict(
     std::Bool=false,
     transform::Bool=true,
     kwargs...,
-) where T
+) where {T}
     # Transform
     X_trans = transform ? (X .- TM.μ_X') ./ TM.σ_X' : X
 
@@ -58,9 +58,9 @@ function linpred(
     dropdims=true,
     kwargs...,
 )
-
     α = get_parameters(TM, [:α]; std=true, kwargs...) # vec required for NamedArray problems below
-    β = fixef(TM; std=true, kwargs...)
+    beta_names = [Symbol("β[$i]") for i in 1:size(TM.X, 2)]
+    β = get_parameters(TM, beta_names; std=true, kwargs...) # vec required for NamedArray problems below
     # handle 3d
     μ = zeros(
         eltype(α), (Dim{:row}(size(X, 1)), Dim{:draw}(size(α, 1)), Dim{:chain}(size(α, 3)))

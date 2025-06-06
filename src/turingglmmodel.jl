@@ -20,7 +20,7 @@ mutable struct TuringGLMModel{T<:UnivariateDistribution}
     Z_names::Tuple
     standardized::Bool
     samples::Union{Nothing,Chains}
-    unstd_params::Union{Nothing, Chains}
+    unstd_params::Union{Nothing,Chains}
 end
 
 # Constructor with names, used in _extended_turing_model()
@@ -38,7 +38,6 @@ function TuringGLMModel(
     σ_y::AbstractFloat,
     standardized::Bool,
 ) where {T<:UnivariateDistribution}
-
     init_X_names = Symbol.(formula.rhs)
     init_Z_names = () #No Z supported
     link = get_link(T)
@@ -59,7 +58,7 @@ function TuringGLMModel(
         init_Z_names,
         standardized,
         nothing,
-        nothing
+        nothing,
     )
 end
 

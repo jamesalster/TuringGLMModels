@@ -2,6 +2,7 @@
 module TuringGLMModels
 
 using Reexport
+using Requires: @require
 @reexport using TuringGLM
 @reexport using DimensionalData
 @reexport using LogExpFunctions: logit, logistic
@@ -12,6 +13,7 @@ using Suppressor: @suppress
 using ParetoSmooth
 using StatsBase: mean, std
 using DataFrames: DataFrame
+using Colors: colormap
 
 include("turingglmmodel.jl")
 include("utils.jl")
@@ -36,6 +38,17 @@ export TuringGLMModel,
     outcome,
     predict,
     psis_loo,
-    loo_compare
+    loo_compare,
+    lineribbon,
+    predictors
 
+function __init__()
+    #Makie required for band
+    @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
+        include("plots/lineribbon.jl")
+        include("plots/plots.jl")
+        export lineribbon
+        export conditional_dependency, pp_check_dens, pp_check_dens_overlay, pp_check_hist
+    end
+end
 end
