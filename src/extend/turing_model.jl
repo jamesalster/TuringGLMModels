@@ -29,7 +29,8 @@ function turing_glm(
 ) where {T<:UnivariateDistribution}
 
     # warning for not standardized
-    standardize || @warn "TuringGLM's model implementation may not perform correctly on unstandardized data."
+    standardize ||
+        @warn "TuringGLM's model implementation may not perform correctly on unstandardized data."
 
     # Get what we need
     y = TuringGLM.data_response(formula, data)
@@ -38,7 +39,11 @@ function turing_glm(
 
     # Error if random effects
     ranef = TuringGLM.ranef(formula)
-    isnothing(ranef) || throw(ArgumentError("TuringGLMModels (unlike TuringGLM) does not yet support random effects."))
+    isnothing(ranef) || throw(
+        ArgumentError(
+            "TuringGLMModels (unlike TuringGLM) does not yet support random effects."
+        ),
+    )
 
     # Standardize X
     if standardize
@@ -65,12 +70,24 @@ function turing_glm(
     prior = TuringGLM._prior(priors, y_std, T)
 
     # Make the TuringGLM model
-    constructed_model = TuringGLM._turing_model(formula, std_data, T; priors, standardize=false)
+    constructed_model = TuringGLM._turing_model(
+        formula, std_data, T; priors, standardize=false
+    )
 
     # Construct TuringArm object
     return TuringGLMModel(
-        T, formula, constructed_model, prior, 
-        y_std, X_std, Z, μ_X, σ_X, μ_y, σ_y, standardize
+        T,
+        formula,
+        constructed_model,
+        prior,
+        y_std,
+        X_std,
+        Z,
+        μ_X,
+        σ_X,
+        μ_y,
+        σ_y,
+        standardize,
     )
 end
 

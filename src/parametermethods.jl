@@ -1,5 +1,4 @@
 
-
 # Internal function to access parameters from samples object as DimArray
 function _get_parameters(TM::TuringGLMModel, params::Vector{Symbol})::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
@@ -10,10 +9,11 @@ end
 # Internal function to access parameters from unstandardized samples object as DimArray
 function _get_unstd_parameters(TM::TuringGLMModel, params::Vector{Symbol})::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
-    arr = DimArray(TM.unstd_params[params].value, (Dim{:draw}, Dim{:param}(params), Dim{:chain}))
+    arr = DimArray(
+        TM.unstd_params[params].value, (Dim{:draw}, Dim{:param}(params), Dim{:chain})
+    )
     return arr
 end
-
 
 ## Parameter methods
 """
@@ -38,7 +38,9 @@ Extract specific parameters from fitted model as DimArray.
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; std=false, kwargs...)::DimArray
+function get_parameters(
+    TM::TuringGLMModel, params::Vector{Symbol}; std=false, kwargs...
+)::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
     # access parameters
     arr = std ? _get_parameters(TM, params) : _get_unstd_parameters(TM, params)
@@ -47,7 +49,8 @@ function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; std=false, k
     arr = set(arr, Dim{:param} => new_names)
     # Filter draws
     arr = process_draws(arr; kwargs...)
-    size(arr, 1) == 0 && @warn "No samples returned, check kwargs and perhaps try adjusting `drop_warmup`?"
+    size(arr, 1) == 0 &&
+        @warn "No samples returned, check kwargs and perhaps try adjusting `drop_warmup`?"
     return arr
 end
 
@@ -88,7 +91,7 @@ Get fixed effect coefficients (β parameters).
 function fixef(
     TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
 )
-    fixef_names = [Symbol("β[$i]") for i in 1:size(TM.X, 2)]
+    fixef_names = [:α, [Symbol("β[$i]") for i in 1:size(TM.X, 2)]...]
     params = get_parameters(TM, fixef_names; kwargs...)
     params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
     return dropdims ? drop_single_dims(params) : params
@@ -138,5 +141,16 @@ Get the response variable as DimArray.
 """
 function outcome(TM::TuringGLMModel; std=false)
     out = std ? TM.y : TM.y .* TM.σ_y .+ TM.μ_y
-    return DimArray(out, (Dim{:outcome}))
+    return DimArray(out, (Dim{:row}))
+end
+
+"""
+    predictors(TM::TuringGLMModel; std=false)
+
+Get the predictor matrix variable as DimArray.
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
+"""
+function predictors(TM::TuringGLMModel; std=false)
+    out = std ? TM.X : TM.X .* TM.σ_X' .+ TM.μ_X'
+    return DimArray(out, (Dim{:row}, Dim{:var}([TM.X_names...])))
 end
