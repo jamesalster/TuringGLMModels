@@ -29,7 +29,7 @@ function get_link(::Type{T}) where {T<:UnivariateDistribution}
         return identity
     elseif T == Bernoulli
         return logit
-    elseif T ∈ [Poisson, NegativeBinomial, TuringGLM.NegativeBinomial2]
+    elseif T ∈ [Poisson, NegativeBinomial]
         return log
     else
         @warn "Distribution $T unknown, assuming identity link"

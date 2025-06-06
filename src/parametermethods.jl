@@ -31,7 +31,7 @@ function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)::
 end
 
 """
-    parameters(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    parameters(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Get all model parameters.
 
@@ -40,15 +40,18 @@ Get all model parameters.
 - `drop_warmup`: Number of warmup samples to drop from each chain  
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
-function parameters(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
+function parameters(
+    TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
+)
     params = get_parameters(TM, TM.samples.name_map[:parameters]; kwargs...)
     params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
-    return drop_single_dims(params)
+    return dropdims ? drop_single_dims(params) : params
 end
 
 """
-    fixef(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    fixef(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Get fixed effect coefficients (β parameters).
 
@@ -57,16 +60,19 @@ Get fixed effect coefficients (β parameters).
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)  
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
-function fixef(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
+function fixef(
+    TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
+)
     fixef_names = [Symbol("β[$i]") for i in 1:size(TM.X, 2)]
     params = get_parameters(TM, fixef_names; kwargs...)
     params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
-    return drop_single_dims(params)
+    return dropdims ? drop_single_dims(params) : params
 end
 
 """
-    internals(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    internals(TM::TuringGLMModel, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Get internal parameters (auxiliary parameters like σ, ν, etc).
 
@@ -75,12 +81,15 @@ Get internal parameters (auxiliary parameters like σ, ν, etc).
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
-function internals(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
+function internals(
+    TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
+)
     internals_names = TM.samples.name_map[:internals]
     params = get_parameters(TM, internals_names; kwargs...)
     params = isnothing(fun) ? params : mapslices(fun, params; dims=1)
-    return drop_single_dims(params)
+    return dropdims ? drop_single_dims(params) : params
 end
 
 """
@@ -91,9 +100,9 @@ Get coefficient point estimates using specified summary function.
 # Arguments
 - `fun`: Summary function to apply (default: median)
 """
-function coefs(TM::TuringGLMModel, fun::Function=median)
+function coefs(TM::TuringGLMModel, fun::Function=median; kwargs...)
     @info "Reducing with function: $(fun)"
-    return fixef(TM, fun)
+    return fixef(TM, fun; kwargs...)
 end
 
 """

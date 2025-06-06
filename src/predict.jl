@@ -35,7 +35,7 @@ function predict(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwarg
 end
 
 """
-    linpred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    linpred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Generate linear predictor values (α + Xβ).
 
@@ -45,9 +45,14 @@ Generate linear predictor values (α + Xβ).
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
 function linpred(
-    TM::TuringGLMModel, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+    TM::TuringGLMModel,
+    X::AbstractArray,
+    fun::Union{Nothing,Function}=nothing;
+    dropdims=true,
+    kwargs...,
 )
     #standardize? - check here since this is the 'base' method for all predictions
     TM.standardized &&
@@ -64,11 +69,11 @@ function linpred(
         μ[:, :, i] = vec(α[:, :, i])' .+ X * β[:, :, i]'
     end
     μ = isnothing(fun) ? μ : mapslices(fun, μ; dims=2)
-    return drop_single_dims(μ)
+    return dropdims ? drop_single_dims(μ) : μ
 end
 
 """
-    epred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    epred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Generate expected predictions (inverse link of linear predictor).
 
@@ -78,9 +83,14 @@ Generate expected predictions (inverse link of linear predictor).
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
 function epred(
-    TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+    TM::TuringGLMModel{T},
+    X::AbstractArray,
+    fun::Union{Nothing,Function}=nothing;
+    dropdims=true,
+    kwargs...,
 ) where {T}
     μ = linpred(TM, X; kwargs...) # don't pass fun
     invlink = let
@@ -94,11 +104,11 @@ function epred(
     end
     epreds = invlink.(μ)
     epreds = isnothing(fun) ? epreds : mapslices(fun, epreds; dims=2)
-    return drop_single_dims(epreds)
+    return dropdims ? drop_single_dims(epreds) : epreds
 end
 
 """
-    posterior_pred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    posterior_pred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
 
 Generate posterior predictive samples (includes observation noise).
 
@@ -108,9 +118,14 @@ Generate posterior predictive samples (includes observation noise).
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
 """
 function posterior_pred(
-    TM::TuringGLMModel{T}, X::AbstractArray, fun::Union{Nothing,Function}=nothing; kwargs...
+    TM::TuringGLMModel{T},
+    X::AbstractArray,
+    fun::Union{Nothing,Function}=nothing;
+    dropdims=true,
+    kwargs...,
 ) where {T}
     epreds = epred(TM, X; kwargs...) #don't pass fun
     ndraws = size(epreds, 2)
@@ -131,5 +146,5 @@ function posterior_pred(
     end
     posterior_preds =
         isnothing(fun) ? posterior_preds : mapslices(fun, posterior_preds; dims=2)
-    return drop_single_dims(posterior_preds)
+    return dropdims ? drop_single_dims(posterior_preds) : posterior_preds
 end
