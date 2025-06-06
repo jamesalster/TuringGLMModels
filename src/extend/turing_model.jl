@@ -39,6 +39,10 @@ function turing_glm(
         y_std = y
     end
 
+    # Error if random effects
+    ranef = TuringGLM.ranef(formula)
+    isnothing(ranef) || throw(ArgumentError("TuringGLMModels (unlike TuringGLM) does not yet support random effects."))
+
     # Make the TuringGLM model
     constructed_model = TuringGLM._turing_model(formula, data, T; priors, standardize)
 

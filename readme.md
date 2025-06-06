@@ -109,6 +109,6 @@ This package simply wraps [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/sta
 ## TODO
 
 * Revise readme and docs so not written by LLM
-* Add testing
+* Add testing for model outputs
 * Add simple plots
 * Add support for random effects

@@ -18,6 +18,7 @@ end
     loo_compare(models::AbstractVector{<:TuringGLMModel}; kwargs...)
 
 Compare multiple models using leave-one-out cross-validation.
+    Passing `model_names` as a tuple will name the outputs.
 
 # Arguments
 - `models`: Vector of fitted TuringGLMModel objects
@@ -25,7 +26,7 @@ Compare multiple models using leave-one-out cross-validation.
 """
 function ParetoSmooth.loo_compare(models::AbstractVector{<:TuringGLMModel}; kwargs...)
     @nospecialize models
-    psis_objects = psis_loo.(models...)
+    psis_objects = psis_loo.(models)
     return loo_compare(psis_objects; kwargs...)
 end
 
@@ -33,6 +34,7 @@ end
     loo_compare(models::TuringGLMModel...; kwargs...)
 
 Compare multiple models using leave-one-out cross-validation.
+    Passing `model_names` as a tuple will name the outputs.
 
 # Arguments
 - `models...`: Multiple TuringGLMModel objects passed as separate arguments

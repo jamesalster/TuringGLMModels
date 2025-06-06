@@ -28,6 +28,8 @@ function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)::
         TM.samples[params].value, (Dim{:draw}, Dim{:param}(new_names), Dim{:chain})
     )
     params = process_draws(arr; kwargs...)
+    size(params, 1) == 0 && @warn "No samples returned, check kwargs and perhaps try adjusting `drop_warmup`?"
+    return params
 end
 
 """

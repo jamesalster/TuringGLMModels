@@ -30,7 +30,7 @@ function TuringGLMModel(
     standardized::Bool,
 ) where {T<:UnivariateDistribution}
     init_X_names = Symbol.(formula.rhs)
-    init_Z_names = isnothing(Z) ? () : throw(ArgumentError("Z not yest supported"))
+    init_Z_names = () #No Z supported
     link = get_link(T)
     return TuringGLMModel{T}(
         formula,

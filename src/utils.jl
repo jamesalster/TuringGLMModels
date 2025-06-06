@@ -4,6 +4,7 @@ function process_draws(
     arr::DimArray; drop_warmup::Int=200, n_draws::Int=-1, collapse::Bool=true
 )
     arr = arr[(drop_warmup + 1):End, :, :] #drop warmup
+    n_draws > size(arr, 1) && throw(ErrorException("$n_draws draws is too many from $(size(arr, 1)) available. Note that n_draws is applied per chain."))
     arr = n_draws > 0 ? arr[1:n_draws, :, :] : arr #select draws
     if collapse
         return transpose(mergedims(arr, (:draw, :chain) => :draw))
