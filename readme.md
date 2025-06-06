@@ -1,21 +1,23 @@
 
-# TuringArm.jl
+# TuringGLMModels.jl
 
 A simple wrapper around [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/stable/) for Bayesian regression.
 
 Uses DimArrays for outputs, allowing easy indexing.
 
+***Important*** initial testing shows that the TuringGLM implementation performs less well when the data is not standardized. For this reason, all fits are handled at a standardized level, and estimates are converted back to the original linear model scale by default. Outcomes are also standardized if the family is Normal or TDist. See the docstrings for how to access the standardized results, or to override this.
+
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add("TuringArm")
+Pkg.add("TuringGLMModels")
 ```
 
 ## Usage
 
 ```julia
-using TuringArm, RDatasets, Statistics
+using TuringGLModels, RDatasets, Statistics
 
 # Load car data
 mtcars = dataset("datasets", "mtcars")
@@ -108,7 +110,7 @@ This package simply wraps [TuringGLM.jl](https://turinglang.org/TuringGLM.jl/sta
 
 ## TODO
 
-* Revise readme and docs so not written by LLM
-* Add testing for model outputs
 * Add simple plots
 * Add support for random effects
+* Revise readme and docs so not written by LLM
+* Add stronger testing for model outputs

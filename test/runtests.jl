@@ -8,12 +8,12 @@ using StatsModels
 using StatsBase: mean, std
 using Suppressor: @suppress
 using Random
+using GLM
 
 @info "Setting up tests"
 mtcars = dataset("datasets", "mtcars")
 
 @warn "No tests yet implemented for actual fit/prediction correctness."
-
 
 @testset "Model Creation" begin
 
@@ -30,21 +30,23 @@ mtcars = dataset("datasets", "mtcars")
     @test mod1.model isa DynamicPPL.Model
     @test mod1.prior isa CustomPrior
     @test mod1.link == identity
-    @test mod1.y == y
-    @test mod1.X == predmat
+    @test mod1.y isa Vector
+    @test mod1.X isa Matrix
     @test isnothing(mod1.Z)
     @test mod1.X_names == (:Cyl, :Disp)
     @test mod1.Z_names == ()
-    @test !mod1.standardized
+    @test mod1.standardized
+    @test isapprox(mean(mod1.X; dims = 1), zeros(1, size(mod1.X, 2)); atol=1e-12)
+    @test isapprox(std(mod1.X; dims = 1), ones(1, size(mod1.X, 2)); atol=1e-12)
     @test isnothing(mod1.samples)
 
     # CUstrom prior
-    prior = CustomPrior(Normal(0,2), Normal(20, 5), Exponential(1));
-    mod1b = @test_nowarn turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; priors=prior);
+    prior = CustomPrior(Normal(0,2), Normal(0, 1), Exponential(1));
+    mod1b = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; priors=prior);
     @test mod1b.prior == prior
 
     # Test X y method
-    mod2 = @test_nowarn turing_glm(
+    mod2 = turing_glm(
         y, predmat, Normal;
         names=[:Cyl, :Disp]
     );
@@ -53,7 +55,7 @@ mtcars = dataset("datasets", "mtcars")
     @test mod2.X == mod1.X
     @test mod2.X_names == mod1.X_names
 
-    mod2b = @test_nowarn turing_glm(y, predmat, Normal)
+    mod2b = turing_glm(y, predmat, Normal)
     @test mod2b.X_names == (:X1, :X2)
     @test mod2b.X == mod1.X
 
@@ -72,20 +74,27 @@ mtcars = dataset("datasets", "mtcars")
     # Test error (from TuringGLM) on wrong family
     mod7 = @test_throws ArgumentError turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Categorical)
 
-    # Test standardized warning
-    mod2 = @test_warn "standardized" turing_glm( @formula(MPG ~ Cyl + Disp), mtcars, Normal; standardize=true )
+    # Standardized
+    mod8 = @test_warn "standardi" turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; standardize=false);
+    @test mod8.X == predmat
+    @test mod8.y == y
+    @test !mod8.standardized
 
-    @test mod2.standardized
-    @test isapprox(mean(mod2.X; dims = 1), zeros(1, size(mod2.X, 2)); atol=1e-12)
-    @test isapprox(std(mod2.X; dims = 1), ones(1, size(mod2.X, 2)); atol=1e-12)
+    # Standardization for count outcome
+    mod9 = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson);
+    @test isapprox(mean(mod9.X; dims = 1), zeros(1, size(mod9.X, 2)); atol=1e-12)
+    @test isapprox(std(mod9.X; dims = 1), ones(1, size(mod9.X, 2)); atol=1e-12)
+    @test mod9.y == vec(mtcars.HP)
+    @test !mod8.standardized
 end
 
 @testset "Model Fit" begin
-    mod1 = turing_glm( @formula(MPG ~ Cyl + Disp), mtcars, Normal);n
+    mod1 = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal);
 
     # Fit
     mod1 = @test_nowarn fit!(mod1);
     @test mod1.samples isa MCMCChains.Chains
+    @test mod1.unstd_params isa MCMCChains.Chains
 
     # Default size
     @test size(mod1.samples) == (2000, 16, 4)
@@ -104,12 +113,12 @@ end
 # Init global model for following sections
 @info "Fitting models for tests"
 
-prior = CustomPrior(Normal(0,2), Normal(20, 5), Exponential(1));
+prior = CustomPrior(Normal(0,2), Normal(0, 5), Exponential(1));
 mod = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, TDist; priors=prior);
 mod_empty = deepcopy(mod);
 mod = @suppress fit!(mod);
-mod_std = @suppress turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; standardize=true);
-mod_std = @suppress fit!(mod_std, N=50, nchains=1);
+mod_notstd = @suppress turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; standardize=false);
+mod_notstd = @suppress fit!(mod_notstd, N=50, nchains=1);
 mod_count = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson);
 fit!(mod_count);
 
@@ -139,6 +148,7 @@ fit!(mod_count);
     @test size(get_parameters(mod, pars; n_draws = 50)) == (50 * default_chains, length(pars))
     @test size(get_parameters(mod, pars; n_draws = 50)) == (50 * default_chains, length(pars))
     @test size(get_parameters(mod, pars; collapse=false)) == (default_samples - default_dropwarmup, length(pars), default_chains)
+    @test size(get_parameters(mod, pars; collapse=false, std=false)) == (default_samples - default_dropwarmup, length(pars), default_chains)
     @test_throws ErrorException get_parameters(mod, pars; drop_warmup = 2000, n_draws=5000) 
 
     # Test derivative methods with funciton and kwargs
@@ -149,9 +159,9 @@ fit!(mod_count);
     @test ndims(parameters(mod, median; collapse=false, dropdims=false)) == 3
 
     # On single chain version with too few draws
-    @test_warn "drop_warmup" get_parameters(mod_std, [:α])
-    @test ndims(parameters(mod_std, median; drop_warmup=0, collapse=false, dropdims=false)) == 3
-    @test ndims(parameters(mod_std, median; drop_warmup=0, collapse=false, dropdims=true)) == 1
+    @test_warn "drop_warmup" get_parameters(mod_notstd, [:α])
+    @test ndims(parameters(mod_notstd, median; drop_warmup=0, collapse=false, dropdims=false)) == 3
+    @test ndims(parameters(mod_notstd, median; drop_warmup=0, collapse=false, dropdims=true)) == 1
 
     # Test other methods more simply
     @test fixef(mod) == get_parameters(mod, [Symbol("β[1]"),Symbol("β[2]")])
@@ -180,43 +190,57 @@ fit!(mod_count);
 
     out = outcome(mod) 
     @test out isa DimArray
-    @test out == mod.y
+    @test out == mod.y .* mod.σ_y .+ mod.μ_y
 end
 
 @testset "Prediction" begin
     # Basic prediction, with a count model
-    pred_data = Matrix(mtcars[5:9,[:Cyl, :Disp]])
-
-    #basic linpred
-    alpha = vec(Array(get_parameters(mod_count, [:α])))
-    beta = Matrix(get_parameters(mod_count, [Symbol("β[1]"),Symbol("β[2]")]))
-    pred_data = Matrix(mtcars[5:9,[:Cyl, :Disp]])
-    pred_manual = alpha .+ beta * pred_data' 
-    @test linpred(mod_count, pred_data) == transpose(pred_manual)
+    predmat = Matrix(mtcars[5:9,[:Cyl, :Disp]])
+    pred_data = (predmat .- mean(predmat; dims = 1)) ./ std(predmat; dims = 1)
 
     # Methods pass
-    lp = @test_nowarn linpred(mod_count, pred_data)
-    ep = @test_nowarn epred(mod_count, pred_data)
-    pp = @test_nowarn posterior_pred(mod_count, pred_data)
+    lp = @test_nowarn predict(mod_count, pred_data; type=:linpred)
+    ep = @test_nowarn predict(mod_count, pred_data; type=:epred)
+    pp = @test_nowarn predict(mod_count, pred_data; type=:posterior)
 
     # Relations: link
     @test isapprox(lp, log.(ep))
     @test var(pp) > var(ep) #higher variance
     # Relations: without link
-    @test linpred(mod, pred_data) == epred(mod, pred_data)
-    @test var(posterior_pred(mod, pred_data)) > var(epred(mod, pred_data))
+    @test predict(mod, pred_data; type=:linpred) == predict(mod, pred_data; type=:epred)
+    @test var(predict(mod, pred_data; type=:posterior)) > var(predict(mod, pred_data; type=:epred))
 
-    # calling self
-    @test predict(mod_count, type=:linpred) == linpred(mod_count, mod_count.X)
-    @test predict(mod_count, mod.X, type=:linpred) == linpred(mod_count, mod_count.X)
-    @test predict(mod_count, type=:epred) == epred(mod_count, mod_count.X)
-    @test let
-        Random.seed!(349)
-        pp1 = predict(mod_count, type=:posterior) 
-        Random.seed!(349)
-        pp2 = posterior_pred(mod_count, mod_count.X)
-        pp1 == pp2
-    end
+    # test kwargs
+    @test predict(mod_count, mod.X; transform=false) isa DimArray
+    @test predict(mod_count, mod.X; std=true) isa DimArray
+end
+
+@testset "Prediction against GLM" begin
+
+    mod = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; priors=prior);
+    fit!(mod);
+    mod_glm = lm(@formula(MPG ~ Cyl + Disp), mtcars);
+    @test isapprox(GLM.coef(mod_glm), parameters(mod, median)[1:3], atol = 0.05)
+    @test isapprox(GLM.predict(mod_glm), predict(mod, median; type=:epred), atol = 0.05)
+
+    mod2 = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson; priors=prior);
+    fit!(mod2);
+    mod2_glm = glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson(), LogLink());
+    @test isapprox(GLM.coef(mod2_glm), parameters(mod2, median)[1:3], atol = 0.05)
+    @test isapprox(GLM.predict(mod2_glm), predict(mod2, median; type=:epred), atol = 2)
+
+    mod3 = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, NegativeBinomial; priors=prior);
+    fit!(mod3);
+    mod3_glm = glm(@formula(HP ~ Cyl + Disp), mtcars, NegativeBinomial(), LogLink());
+    @test isapprox(GLM.coef(mod3_glm), parameters(mod3, median)[1:3], atol = 0.05)
+    @test isapprox(GLM.predict(mod3_glm), predict(mod3, median; type=:epred), atol = 2)
+
+    mtcars.binom = mtcars.MPG .> 20;
+    mod4 = turing_glm(@formula(binom ~ Cyl + Disp), mtcars, Bernoulli; priors=prior);
+    fit!(mod4);
+    mod4_glm = glm(@formula(binom ~ Cyl + Disp), mtcars, Binomial(), LogitLink());
+    @test_broken isapprox(GLM.coef(mod4_glm), parameters(mod4, median)[1:3], atol = 0.05)
+    @test isapprox(GLM.predict(mod4_glm), predict(mod4, median; type=:epred), atol = 2)
 end
 
 @testset "Display Methods" begin
@@ -229,15 +253,13 @@ end
     @test contains(show_output, "Intercept")
     @test contains(show_output, "Intercept")
     @test contains(show_output, "Normal(μ=0.0, σ=2.0)")
-    @test contains(show_output, "Normal(μ=20.0, σ=5.0)")
+    @test contains(show_output, "Normal(μ=0.0, σ=5.0)")
     @test contains(show_output, "Exponential(θ=1.0)")
     @test contains(show_output, "Auxiliary")
     @test contains(show_output, "TDist")
     @test contains(show_output, "32") #Observations
     @test contains(show_output, "8000 samples") 
     @test contains(show_output, "4 chains") 
-    # Standardized
-    @test contains(sprint(show, mod_std), "standardized")
     # Empty
     @test contains(sprint(show, mod_empty), "empty")
 
@@ -250,16 +272,16 @@ end
     coef = string.(round.(parent(parameters(mod, median; drop_warmup = 0)); digits = 2))
     @test all(contains.(Ref(pretty_output), coef))
     # that pretty and show contain warning
-    @test_warn "rhat" show(mod_std);
-    @test_warn "rhat" pretty(mod_std);
+    @test_warn "rhat" show(mod_notstd);
+    @test_warn "rhat" pretty(mod_notstd);
 end
 
 @testset "Model Comparison" begin
     @test psis_loo(mod) isa ParetoSmooth.PsisLoo
-    comp1 = loo_compare(mod, mod_std)
+    comp1 = loo_compare(mod, mod_notstd)
     @test comp1 isa ParetoSmooth.ModelComparison
-    comp2 = loo_compare([mod, mod_std])
+    comp2 = loo_compare([mod, mod_notstd])
     @test sprint(show, comp1) == sprint(show, comp2)
-    comp1b = loo_compare(mod, mod_std; model_names = ("Mod1", "Mod2"))
+    comp1b = loo_compare(mod, mod_notstd; model_names = ("Mod1", "Mod2"))
     @test contains(sprint(show, comp1b), "Mod1")
 end

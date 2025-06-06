@@ -1,6 +1,5 @@
-
 """
-    predict(TM::TuringGLMModel, X::AbstractArray, fun=nothing; type=:posterior, kwargs...)
+    predict(TM::TuringGLMModel, X::AbstractArray, fun=nothing; type=:posterior, transform=TM.standardized, std=false, kwargs...)
     predict(TM::TuringGLMModel, fun=nothing; kwargs...)
 
 Generate predictions for new data or fitted data.
@@ -9,44 +8,49 @@ Generate predictions for new data or fitted data.
 - `X`: Design matrix for predictions (optional, uses fitted data if omitted)
 - `fun`: Optional function to apply across draws
 - `type`: Type of prediction (:posterior, :epred, :linpred)
-"""
-function predict(
-    TM::TuringGLMModel,
-    X::AbstractArray,
-    fun::Union{Nothing,Function}=nothing;
-    type::Symbol=:posterior,
-    kwargs...,
-)
-    #TODO handle Z
-    if type === :posterior
-        return posterior_pred(TM, X, fun; kwargs...)
-    elseif type === :epred
-        return epred(TM, X, fun; kwargs...)
-    elseif type === :linpred
-        return linpred(TM, X, fun; kwargs...)
-    else
-        throw(ArgumentError("type must be one of :posterior, :epred or :linpred"))
-    end
-end
-
-function predict(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
-    #TODO handle Z
-    return predict(TM, TM.X, fun; kwargs...)
-end
-
-"""
-    linpred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
-
-Generate linear predictor values (α + Xβ).
-
-# Arguments
-- `X`: Design matrix
-- `fun`: Optional function to apply across draws
+- `transform`: Standardize data before feeding to model? 
+- `std`: Return predictions at the standardized scale? 
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 - `dropdims`: Whether to drop singleton dimensions (default: true)
 """
+function predict(
+    TM::TuringGLMModel{T},
+    X::AbstractArray,
+    fun::Union{Nothing,Function}=nothing;
+    type::Symbol=:posterior,
+    std::Bool=false,
+    transform::Bool=true,
+    kwargs...,
+) where T
+    # Transform
+    X_trans = transform ? (X .- TM.μ_X') ./ TM.σ_X' : X
+
+    if type === :posterior
+        preds = posterior_pred(TM, X_trans, fun; kwargs...)
+    elseif type === :epred
+        preds = epred(TM, X_trans, fun; kwargs...)
+    elseif type === :linpred
+        preds = linpred(TM, X_trans, fun; kwargs...)
+    else
+        throw(ArgumentError("type must be one of :posterior, :epred or :linpred"))
+    end
+
+    # Unstandardize
+    if !std && T ∈ [Normal, TDist]
+        unstandardize_predictions!(preds, TM)
+    end
+
+    return preds
+end
+
+function predict(TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; kwargs...)
+    # Do not transform because it is already
+    return predict(TM, TM.X, fun; transform=false, kwargs...)
+end
+
+#### Internal functions ####
 function linpred(
     TM::TuringGLMModel,
     X::AbstractArray,
@@ -54,13 +58,9 @@ function linpred(
     dropdims=true,
     kwargs...,
 )
-    #standardize? - check here since this is the 'base' method for all predictions
-    TM.standardized &&
-        (X !== TM.X) &&
-        @warn "Standardization not applied to new data when predicting."
 
-    α = get_parameters(TM, [:α]; kwargs...) # vec required for NamedArray problems below
-    β = fixef(TM; kwargs...)
+    α = get_parameters(TM, [:α]; std=true, kwargs...) # vec required for NamedArray problems below
+    β = fixef(TM; std=true, kwargs...)
     # handle 3d
     μ = zeros(
         eltype(α), (Dim{:row}(size(X, 1)), Dim{:draw}(size(α, 1)), Dim{:chain}(size(α, 3)))
@@ -72,19 +72,6 @@ function linpred(
     return dropdims ? drop_single_dims(μ) : μ
 end
 
-"""
-    epred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
-
-Generate expected predictions (inverse link of linear predictor).
-
-# Arguments  
-- `X`: Design matrix
-- `fun`: Optional function to apply across draws
-- `drop_warmup`: Number of warmup samples to drop from each chain
-- `n_draws`: Number of draws to keep (-1 for all post-warmup)
-- `collapse`: Whether to collapse chains into single dimension
-- `dropdims`: Whether to drop singleton dimensions (default: true)
-"""
 function epred(
     TM::TuringGLMModel{T},
     X::AbstractArray,
@@ -107,19 +94,6 @@ function epred(
     return dropdims ? drop_single_dims(epreds) : epreds
 end
 
-"""
-    posterior_pred(TM::TuringGLMModel, X::AbstractArray, fun=nothing; drop_warmup=200, n_draws=-1, collapse=true, dropdims=true, kwargs...)
-
-Generate posterior predictive samples (includes observation noise).
-
-# Arguments
-- `X`: Design matrix  
-- `fun`: Optional function to apply across draws
-- `drop_warmup`: Number of warmup samples to drop from each chain
-- `n_draws`: Number of draws to keep (-1 for all post-warmup)
-- `collapse`: Whether to collapse chains into single dimension
-- `dropdims`: Whether to drop singleton dimensions (default: true)
-"""
 function posterior_pred(
     TM::TuringGLMModel{T},
     X::AbstractArray,
@@ -130,18 +104,18 @@ function posterior_pred(
     epreds = epred(TM, X; kwargs...) #don't pass fun
     ndraws = size(epreds, 2)
     if T == Normal
-        σ = vec(get_parameters(TM, [:σ]; kwargs...))
+        σ = vec(get_parameters(TM, [:σ]; std=true, kwargs...))
         posterior_preds = (rand(T(), ndraws) .* σ)' .+ epreds
     elseif T == TDist
-        σ = vec(get_parameters(TM, [:σ]; kwargs...))
-        ν = vec(get_parameters(TM, [:ν]; kwargs...))
+        σ = vec(get_parameters(TM, [:σ]; std=true, kwargs...))
+        ν = vec(get_parameters(TM, [:ν]; std=true, kwargs...))
         posterior_preds = (rand.(T.(ν)) .* σ)' .+ epreds
     elseif T == Bernoulli
         posterior_preds = rand.(Bernoulli.(epreds))
     elseif T == Poisson
         posterior_preds = rand.(Poisson.(epreds))
     elseif T == NegativeBinomial
-        ϕ⁻ = vec(get_parameters(TM, [:ϕ⁻]; kwargs...))
+        ϕ⁻ = vec(get_parameters(TM, [:ϕ⁻]; std=true, kwargs...))
         posterior_preds = rand.(TuringGLM.NegativeBinomial2.(epreds, ϕ⁻'))
     end
     posterior_preds =

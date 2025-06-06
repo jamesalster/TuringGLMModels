@@ -1,10 +1,11 @@
 name = "TuringGLMModels"
 uuid = "05562f13-f1cd-4651-9224-340edb91df25"
 authors = ["James Alster <jamesalster2@gmail.com"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 AbstractMCMC = "80f14c24-f653-4e6a-9b94-39d6b0f70001"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DimensionalData = "0703355e-b756-11e9-17c0-8b28908087d0"
 DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
 GLM = "38e38edf-8417-5370-95a0-9cbb8c7f171a"
@@ -13,12 +14,14 @@ MCMCChains = "c7f686f2-ff18-58e9-bc7b-31028e88f75d"
 ParetoSmooth = "a68b5a21-f429-434e-8bfa-46b447300aac"
 PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StatsModels = "3eaba693-59b7-5ba5-a881-562e759f1c8d"
 Suppressor = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
 TuringGLM = "0004c1f4-53c5-4d43-a221-a1dac6cf6b74"
 
 [compat]
 AbstractMCMC = "5.6.2"
+DataFrames = "1.7.0"
 DimensionalData = "0.29.17"
 DynamicPPL = "0.34.2"
 GLM = "1.9.0"
@@ -26,14 +29,14 @@ LogExpFunctions = "0.3.29"
 MCMCChains = "6.0.7"
 ParetoSmooth = "0.7.15"
 PrettyTables = "2.4.0"
+StatsBase = "0.34.5"
 StatsModels = "0.7.4"
 Suppressor = "0.2.8"
 
 [extras]
 RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
-StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["RDatasets", "StatsBase", "Random", "Test"]
+test = ["RDatasets", "Random", "Test"]

@@ -1,4 +1,20 @@
 
+
+# Internal function to access parameters from samples object as DimArray
+function _get_parameters(TM::TuringGLMModel, params::Vector{Symbol})::DimArray
+    isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
+    arr = DimArray(TM.samples[params].value, (Dim{:draw}, Dim{:param}(params), Dim{:chain}))
+    return arr
+end
+
+# Internal function to access parameters from unstandardized samples object as DimArray
+function _get_unstd_parameters(TM::TuringGLMModel, params::Vector{Symbol})::DimArray
+    isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
+    arr = DimArray(TM.unstd_params[params].value, (Dim{:draw}, Dim{:param}(params), Dim{:chain}))
+    return arr
+end
+
+
 ## Parameter methods
 """
     parameter_names(TM::TuringGLMModel, params=TM.samples.name_map[:parameters])
@@ -11,25 +27,28 @@ function parameter_names(TM::TuringGLMModel, params=TM.samples.name_map[:paramet
 end
 
 """
-    get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
+    get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; std=false, drop_warmup=200, n_draws=-1, collapse=true, kwargs...)
 
 Extract specific parameters from fitted model as DimArray.
 
 # Arguments
 - `params`: Vector of parameter symbols to extract
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 - `drop_warmup`: Number of warmup samples to drop from each chain
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 """
-function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; kwargs...)::DimArray
+function get_parameters(TM::TuringGLMModel, params::Vector{Symbol}; std=false, kwargs...)::DimArray
     isnothing(TM.samples) && throw(ArgumentError("Model has not been fitted."))
+    # access parameters
+    arr = std ? _get_parameters(TM, params) : _get_unstd_parameters(TM, params)
+    # rename
     new_names = string.(parameter_names(TM, params)) # string to allow regex lookup
-    arr = DimArray(
-        TM.samples[params].value, (Dim{:draw}, Dim{:param}(new_names), Dim{:chain})
-    )
-    params = process_draws(arr; kwargs...)
-    size(params, 1) == 0 && @warn "No samples returned, check kwargs and perhaps try adjusting `drop_warmup`?"
-    return params
+    arr = set(arr, Dim{:param} => new_names)
+    # Filter draws
+    arr = process_draws(arr; kwargs...)
+    size(arr, 1) == 0 && @warn "No samples returned, check kwargs and perhaps try adjusting `drop_warmup`?"
+    return arr
 end
 
 """
@@ -43,6 +62,7 @@ Get all model parameters.
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 - `dropdims`: Whether to drop singleton dimensions (default: true)
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 """
 function parameters(
     TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
@@ -63,6 +83,7 @@ Get fixed effect coefficients (β parameters).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)  
 - `collapse`: Whether to collapse chains into single dimension
 - `dropdims`: Whether to drop singleton dimensions (default: true)
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 """
 function fixef(
     TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
@@ -84,6 +105,7 @@ Get internal parameters (auxiliary parameters like σ, ν, etc).
 - `n_draws`: Number of draws to keep (-1 for all post-warmup)
 - `collapse`: Whether to collapse chains into single dimension
 - `dropdims`: Whether to drop singleton dimensions (default: true)
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 """
 function internals(
     TM::TuringGLMModel, fun::Union{Nothing,Function}=nothing; dropdims=true, kwargs...
@@ -101,6 +123,7 @@ Get coefficient point estimates using specified summary function.
 
 # Arguments
 - `fun`: Summary function to apply (default: median)
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 """
 function coefs(TM::TuringGLMModel, fun::Function=median; kwargs...)
     @info "Reducing with function: $(fun)"
@@ -108,10 +131,12 @@ function coefs(TM::TuringGLMModel, fun::Function=median; kwargs...)
 end
 
 """
-    outcome(TM::TuringGLMModel)
+    outcome(TM::TuringGLMModel; std=false)
 
 Get the response variable as DimArray.
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
 """
-function outcome(TM::TuringGLMModel)
-    return DimArray(TM.y, (Dim{:outcome}))
+function outcome(TM::TuringGLMModel; std=false)
+    out = std ? TM.y : TM.y .* TM.σ_y .+ TM.μ_y
+    return DimArray(out, (Dim{:outcome}))
 end

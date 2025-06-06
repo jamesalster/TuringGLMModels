@@ -12,10 +12,15 @@ mutable struct TuringGLMModel{T<:UnivariateDistribution}
     y::AbstractVector
     X::AbstractMatrix
     Z::Union{Nothing,Matrix}
+    μ_X::AbstractVector
+    σ_X::AbstractVector
+    μ_y::AbstractFloat
+    σ_y::AbstractFloat
     X_names::Tuple
     Z_names::Tuple
     standardized::Bool
     samples::Union{Nothing,Chains}
+    unstd_params::Union{Nothing, Chains}
 end
 
 # Constructor with names, used in _extended_turing_model()
@@ -27,11 +32,17 @@ function TuringGLMModel(
     y::AbstractVector,
     X::AbstractMatrix,
     Z::Union{Nothing,Matrix},
+    μ_X::AbstractVector,
+    σ_X::AbstractVector,
+    μ_y::AbstractFloat,
+    σ_y::AbstractFloat,
     standardized::Bool,
 ) where {T<:UnivariateDistribution}
+
     init_X_names = Symbol.(formula.rhs)
     init_Z_names = () #No Z supported
     link = get_link(T)
+
     return TuringGLMModel{T}(
         formula,
         model,
@@ -40,10 +51,15 @@ function TuringGLMModel(
         y,
         X,
         Z,
+        μ_X,
+        σ_X,
+        μ_y,
+        σ_y,
         init_X_names,
         init_Z_names,
         standardized,
         nothing,
+        nothing
     )
 end
 
@@ -79,11 +95,7 @@ function Base.show(io::IO, TM::TuringGLMModel{T}; warnings=true) where {T}
 
     # Observations
     print(io, label_style, "Observations: ")
-    if TM.standardized
-        println(io, normal_style, "$(size(TM.X, 1)) (standardized)")
-    else
-        println(io, normal_style, size(TM.X, 1))
-    end
+    println(io, normal_style, size(TM.X, 1))
 
     # Samples
     print(io, label_style, "Samples: ")
@@ -129,5 +141,6 @@ function fit!(
     else
         TM.samples = sample(TM.model, sampler, parallel, N, nchains; kwargs...)
     end
+    _make_unstd_parameters!(TM)
     return TM
 end

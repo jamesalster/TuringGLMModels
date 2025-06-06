@@ -10,9 +10,12 @@ using GLM: FormulaTerm
 using DynamicPPL: Model
 using Suppressor: @suppress
 using ParetoSmooth
+using StatsBase: mean, std
+using DataFrames: DataFrame
 
 include("turingglmmodel.jl")
 include("utils.jl")
+include("unstandardize.jl")
 include("parametermethods.jl")
 include("predict.jl")
 include("extend/turing_model.jl")
@@ -32,9 +35,6 @@ export TuringGLMModel,
     internals,
     outcome,
     predict,
-    linpred,
-    epred,
-    posterior_pred,
     psis_loo,
     loo_compare
 

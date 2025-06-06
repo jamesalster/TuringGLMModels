@@ -1,7 +1,7 @@
 
 # build on MCMCChains.summarize
 """
-    pretty(io::IO, TM::TuringGLMModel; funs=[median, std], quantiles=[0.025, 0.975], return_table=false, draws_idx=nothing, kwargs...)
+    pretty(io::IO, TM::TuringGLMModel; funs=[median, std], quantiles=[0.025, 0.975], return_table=false, standardized=false, draws_idx=nothing, kwargs...)
 
 Display formatted summary table of model parameters.
 
@@ -9,6 +9,7 @@ Display formatted summary table of model parameters.
 - `io`: Output stream 
 - `TM`: Fitted TuringGLMModel
 - `funs`: Summary functions to apply (default: [median, std])
+- `standardized`: Return standardized results? Default is false
 - `quantiles`: Quantiles to compute (default: [0.025, 0.975] for 95% CI)
 - `return_table`: Whether to return the summary table as NamedTuple
 - `draws_idx`: Subset of draws to use (default: all draws)
@@ -21,9 +22,11 @@ function pretty(
     quantiles=[0.025, 0.975],
     return_table=false,
     draws_idx=nothing,
+    standardized=false,
     kwargs...,
 )
     isnothing(TM.samples) && throw(ArgumentError("Turing Model has not yet been fit!()"))
+    sample_obj = standardized ? TM.samples : TM.unstd_params
     funs_all = vcat(funs..., [(x -> quantile(x, q)) for q in quantiles]...)
     func_names_all = vcat(
         Symbol.(funs)..., [Symbol("q$(round(q*100; digits =1))") for q in quantiles]...
@@ -32,13 +35,13 @@ function pretty(
     draws_idx = something(draws_idx, 1:size(TM.samples, 1))
     #custom
     chain_df_funs = summarize(
-        TM.samples[draws_idx, :, :],
+        sample_obj[draws_idx, :, :],
         funs_all...;
         sections=:parameters,
         func_names=func_names_all,
     )
     #defaults
-    chain_df_summary_stats = summarize(TM.samples[draws_idx, :, :]; sections=:parameters)
+    chain_df_summary_stats = summarize(sample_obj[draws_idx, :, :]; sections=:parameters)
     # make as named tuple
     chain_info = (;
         chain_df_funs.nt[keys(chain_df_funs.nt)[2:end]]...,
