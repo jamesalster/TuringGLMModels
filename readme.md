@@ -58,9 +58,15 @@ predict(mod, type=:linpred)  # Linear predictor
 new_data = [6.0 200.0; 8.0 350.0]
 predict(mod, new_data, mean) # Optionally pass fucntion
 
+# Metrics
+using StatisticalMeasures # to be able to pass metrics, otherwise defaults only
+calculate_metrics(mod, [rsq, rmse]) # All draws
+calculate_metrics(mod, [rsq, rmse], median) # Pass function to reduce
+default_metrics(mod, mean) # Models have defaults defined
+
 # Compare models
 robust_mod = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, TDist)
-fit!(robust_mod, N=1000, nchains=2)
+fit!(robust_mod, N=4000, nchains=3)
 
 loo_compare(mod, robust_mod)
 
@@ -122,6 +128,9 @@ pp_check_dens_overlay(mod)
 * `pretty(model)` - Formatted summary
 * `parameter_names(model)` - Parameter names
 * `outcome(model)` - Response variable
+* `predictors(model)` - Predictor table
+* `calculate_metrics(model, metrics)` - Model metrics
+* `default_metrics(model)` - Default model metrics
 
 ### Plots
 * `lineribbon!()` - Makie recipe for banded intervalsm, used in `conditional_dependency()`

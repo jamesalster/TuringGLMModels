@@ -9,6 +9,7 @@ using StatsBase: mean, std
 using Suppressor: @suppress
 using Random
 using GLM: GLM
+using StatisticalMeasures
 
 @info "Setting up tests"
 mtcars = dataset("datasets", "mtcars")
@@ -275,6 +276,10 @@ end
     @test contains(show_output, "32") #Observations
     @test contains(show_output, "8000 samples")
     @test contains(show_output, "4 chains")
+    @test contains(show_output, "Prediction Metrics")
+    @test contains(show_output, "RSquared")
+    @test contains(show_output, "median")
+    @test contains(show_output, "sd")
     # Empty
     @test contains(sprint(show, mod_empty), "empty")
 
@@ -304,4 +309,20 @@ end
     @test sprint(show, comp1) == sprint(show, comp2)
     comp1b = loo_compare(mod, mod_notstd; model_names=("Mod1", "Mod2"))
     @test contains(sprint(show, comp1b), "Mod1")
+end
+
+@testset "Metrics" begin
+    tab = @test_nowarn calculate_metrics(mod, [rsq, rmse]) 
+    @test tab isa DimArray
+    @test all(dim(tab, 1) .== ["RSquared", "RootMeanSquaredError"])
+    tab1b = @test_nowarn default_metrics(mod)
+    @test all(dim(tab1b, 1) .== ["RSquared", "RootMeanSquaredError", "MeanAbsoluteError"])
+
+    # Categorical
+    mtcars.binom = mtcars.MPG .> 20;
+    mod4 = turing_glm(@formula(binom ~ Cyl + Disp), mtcars, Bernoulli; priors=prior);
+    tab2 = @test_nowarn calculate_metrics(mod4, [accuracy, kappa])
+    @test all(dim(tab2, 1) .== ["Accuracy", "Kappa"])
+    tab2b = @test_nowarn default_metrics(mod4, [accuracy, kappa])
+    @test all(dim(tab2b, 1) .== ["Accuracy", "Kappa", "TruePositiveRate", "FalsePositiveRate"])
 end

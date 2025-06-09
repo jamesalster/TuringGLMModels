@@ -7,10 +7,12 @@ using Requires: @require
 @reexport using DimensionalData
 @reexport using LogExpFunctions: logit, logistic
 using PrettyTables
+using StatisticalMeasures
+using ParetoSmooth
+
 using GLM: FormulaTerm
 using DynamicPPL: Model
 using Suppressor: @suppress
-using ParetoSmooth
 using StatsBase: mean, std
 using DataFrames: DataFrame
 using Colors: colormap
@@ -22,6 +24,7 @@ include("parametermethods.jl")
 include("predict.jl")
 include("extend/turing_model.jl")
 include("pretty.jl")
+include("metrics.jl")
 include("comparison.jl")
 
 export TuringGLMModel,
@@ -40,7 +43,9 @@ export TuringGLMModel,
     psis_loo,
     loo_compare,
     lineribbon,
-    predictors
+    predictors,
+    calculate_metrics,
+    default_metrics
 
 function __init__()
     #Makie required for band

@@ -25,12 +25,15 @@ function pretty(
     standardized=false,
     kwargs...,
 )
+
     isnothing(TM.samples) && throw(ArgumentError("Turing Model has not yet been fit!()"))
     sample_obj = standardized ? TM.samples : TM.unstd_params
+
     funs_all = vcat(funs..., [(x -> quantile(x, q)) for q in quantiles]...)
     func_names_all = vcat(
         Symbol.(funs)..., [Symbol("q$(round(q*100; digits =1))") for q in quantiles]...
     )
+
     #draws idx
     draws_idx = something(draws_idx, 1:size(TM.samples, 1))
     #custom
@@ -49,6 +52,13 @@ function pretty(
     )
     ncols = length(chain_info)
 
+    #metrics
+    metric_tabs = map(f -> default_metrics(TM, f; dropdims=false), funs_all) 
+    metric_tab = hcat(metric_tabs...)
+    metric_tab = set(metric_tab, Dim{:draw} => Dim{:statistic})
+    metric_tab = set(metric_tab, Dim{:statistic} => DimensionalData.Dimensions.Categorical)
+    metric_tab = set(metric_tab, Dim{:statistic} => func_names_all)
+
     # show
     show(io, TM; warnings=false)
     println(io)
@@ -66,11 +76,17 @@ function pretty(
             ft_printf("%5.0f", [ncols, ncols - 2, ncols - 3]),
             ft_printf("%5.3f", ncols - 1),
         ),
-        tf=tf_compact,
-        header_crayon=crayon"bold",
-        row_label_header_crayon=crayon"bold",
-        crop=:horizontal,
-        show_subheader=false,
+        default_options...
+    )
+    pretty_table(
+        io,
+        parent(metric_tab);
+        title="Prediction Metrics",
+        header=Array(dims(metric_tab, 2)),
+        row_labels=Array(dims(metric_tab, 1)),
+        row_label_column_title="Metric",
+        formatters=(ft_printf("%5.3f")),
+        default_options...
     )
     model_warnings(chain_info)
     if return_table
@@ -118,8 +134,8 @@ Display info and warnings about model fit. Based on `MCMCChains.summarize`
 """
 function model_warnings(TM::TuringGLMModel)
     isnothing(TM.samples) && return nothing
-    chain_info = summarize(TM.samples; sections=:parameters).nt
-    model_warnings(chain_info)
+    chain_info = summarize(TM.samples; sections=:parameters)
+    model_warnings(chain_info.nt)
 end
 
 # Highlighters
@@ -140,3 +156,12 @@ function make_highlighters(ncols)
         ),
     )
 end
+
+# Default table options
+default_options = (;
+        tf=tf_compact,
+        header_crayon=crayon"bold",
+        row_label_header_crayon=crayon"bold",
+        crop=:horizontal,
+        show_subheader=false,
+)

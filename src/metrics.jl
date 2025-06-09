@@ -1,0 +1,83 @@
+
+# Calcualte a single metric across draws
+function _calculate_metric(metric, preds::DimArray, y::DimArray)::DimArray
+    return mapslices(x -> metric(x, y), preds; dims=1)
+end
+
+
+# Calculate many metrics across draws, and handle the DimArray neatly
+"""
+    calculate_metrics(TM::TuringGLMModel, metrics::Vector, fun=nothing; dropdims=true, threshold=0.5, kwargs...)
+
+Calculate multiple metrics on model predictions using expected predictions (epred).
+
+Takes a list of metrics (like `accuracy`, `rmse`) from `StatisticalMethods.jl` and applies each one to compare 
+your model's predictions against actual outcomes. Returns results in a table.
+
+# Arguments
+- `metrics`: Vector of metric functions to calculate
+- `fun`: Optional function to apply across draws (e.g., mean, median, std)
+- `threshold`: Class threshold for binary classification (ignored for other models)
+- `drop_warmup`: Number of warmup samples to drop from each chain
+- `n_draws`: Number of draws to keep (-1 for all post-warmup)  
+- `collapse`: Whether to collapse chains into single dimension
+- `dropdims`: Whether to drop singleton dimensions (default: true)
+
+# Examples
+```julia
+calculate_metrics(my_model, [accuracy, kappa])
+# collapse with function
+calculate_metrics(my_model, [rmse, mae], mean, threshold=0.6)
+# select draws
+calculate_metrics(my_model, [rmse, mae], drop_warmup=500, collapse=false)
+"""
+function calculate_metrics(TM::TuringGLMModel{T}, metrics::Vector, fun::Union{Nothing, Function}=nothing; dropdims=true, threshold=0.5, kwargs...)::DimArray where T
+
+    preds = predict(TM, type=:epred; kwargs...)
+    y = outcome(TM)
+
+    # convert to category if necessary
+    if T == Bernoulli 
+        preds = rebuild(preds, StatisticalMeasures.CategoricalArrays.CategoricalArray(parent(preds) .> threshold))
+        y = rebuild(y, StatisticalMeasures.CategoricalArrays.CategoricalArray(parent(y) .== 1))
+    end
+
+    #Calculate table
+    metric_table = cat(map(metric -> _calculate_metric(metric, preds, y), metrics)...; dims = 1)
+
+    #clean names
+    metric_names = replace.(string.(metrics), r"\(.*\)" => "", "LPLoss(p = 1)" => "MeanAbsoluteError")
+    #Broken quick method so we need to do this to set dimensions sadly
+    metric_table = set(metric_table, Dim{:row} => Dim{:metric})
+    metric_table = set(metric_table, Dim{:metric} => DimensionalData.Dimensions.Categorical)
+    metric_table = set(metric_table, Dim{:metric} => [metric_names...])
+
+    metric_table = isnothing(fun) ? metric_table : mapslices(fun, metric_table; dims=2)
+    return dropdims ? drop_single_dims(metric_table) : metric_table
+end
+
+# Get the default metrics for a model family
+function _get_default_metrics(TM::TuringGLMModel{T}) where T
+    if T == Bernoulli
+        return [accuracy, kappa, TruePositiveRate(levels = [false, true]), TrueNegativeRate(levels=[false, true])]
+    else
+        return [rsq, rmse, mae]
+    end
+end
+
+
+"""
+    default_metrics(TM::TuringGLMModel, fun=nothing; kwargs...)
+
+Calculate standard metrics for your model type using expected predictions (epred).
+
+Automatically selects appropriate metrics based on your model's distribution family.
+For binary classification: accuracy, kappa, true positive rate, true negative rate.
+For regression: R-squared, RMSE, mean absolute error.
+
+Other arguments as for `calculate_metrics()`.
+"""
+function default_metrics(TM::TuringGLMModel{T}, fun::Union{Nothing, Function}=nothing; kwargs...) where T
+    metrics = _get_default_metrics(TM)
+    return calculate_metrics(TM, metrics, fun; kwargs...)
+end
