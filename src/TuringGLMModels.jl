@@ -16,6 +16,8 @@ using Suppressor: @suppress
 using StatsBase: mean, std
 using DataFrames: DataFrame
 using Colors: colormap
+using CategoricalArrays: categorical
+using CategoricalDistributions: UnivariateFinite
 
 include("turingglmmodel.jl")
 include("utils.jl")

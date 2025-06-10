@@ -36,17 +36,30 @@ function calculate_metrics(TM::TuringGLMModel{T}, metrics::Vector, fun::Union{No
     preds = predict(TM, type=:epred; kwargs...)
     y = outcome(TM)
 
-    # convert to category if necessary
+    # Special handling for bernoulli
     if T == Bernoulli 
+        # handle AUC, this is messy
+        auc_tab = AreaUnderCurve() in metrics ? _get_auc(preds, y) : []
+        display(auc_tab)
+        # convert to category for remaining metrics
         preds = rebuild(preds, StatisticalMeasures.CategoricalArrays.CategoricalArray(parent(preds) .> threshold))
         y = rebuild(y, StatisticalMeasures.CategoricalArrays.CategoricalArray(parent(y) .== 1))
+        metrics2 = filter(x -> x != auc, metrics)
+        # build table
+        metric_table = cat(map(metric -> _calculate_metric(metric, preds, y), metrics2)...; dims = 1)
+        # add AUC back in if we need
+        if !isempty(auc_tab) 
+            metric_table = !isempty(metric_table) ? cat(metric_table, auc_tab; dims = 1) : auc_tab
+        end
+    else
+        # Calculate table
+        metric_table = cat(map(metric -> _calculate_metric(metric, preds, y), metrics)...; dims = 1)
     end
 
-    #Calculate table
-    metric_table = cat(map(metric -> _calculate_metric(metric, preds, y), metrics)...; dims = 1)
+    #clean names, messy with AUC
+    metric_names = replace.(string.(metrics2), r"\(.*\)" => "", "LPLoss(p = 1)" => "MeanAbsoluteError")
+    metric_names = AreaUnderCurve() in metrics ? vcat(metric_names, "AreaUnderCurve") : metric_names
 
-    #clean names
-    metric_names = replace.(string.(metrics), r"\(.*\)" => "", "LPLoss(p = 1)" => "MeanAbsoluteError")
     #Broken quick method so we need to do this to set dimensions sadly
     metric_table = set(metric_table, Dim{:row} => Dim{:metric})
     metric_table = set(metric_table, Dim{:metric} => DimensionalData.Dimensions.Categorical)
@@ -59,7 +72,7 @@ end
 # Get the default metrics for a model family
 function _get_default_metrics(TM::TuringGLMModel{T}) where T
     if T == Bernoulli
-        return [accuracy, kappa, TruePositiveRate(levels = [false, true]), TrueNegativeRate(levels=[false, true])]
+        return [accuracy, kappa, TruePositiveRate(levels = [false, true]), TrueNegativeRate(levels=[false, true]), auc]
     else
         return [rsq, rmse, mae]
     end
@@ -80,4 +93,13 @@ Other arguments as for `calculate_metrics()`.
 function default_metrics(TM::TuringGLMModel{T}, fun::Union{Nothing, Function}=nothing; kwargs...) where T
     metrics = _get_default_metrics(TM)
     return calculate_metrics(TM, metrics, fun; kwargs...)
+end
+
+# Special function to handle AUC with distribution conversion
+function _get_auc(preds::DimArray, y::DimArray)
+    y_categ = categorical(parent(y) .== 1)
+    mapslices(preds; dims=1) do preds_vec
+        preds_as_distribution = UnivariateFinite(categorical([false, true]), preds_vec, augment=true)
+        return auc(preds_as_distribution, y_categ)
+    end
 end
