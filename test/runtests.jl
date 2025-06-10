@@ -10,11 +10,11 @@ using Suppressor: @suppress
 using Random
 using GLM: GLM
 using StatisticalMeasures
+using CategoricalDistributions
 
 @info "Setting up tests"
 mtcars = dataset("datasets", "mtcars")
 
-@warn "No tests yet implemented for actual fit/prediction correctness."
 @warn "No tests yet implemented for plots"
 
 @testset "Model Creation" begin
@@ -202,6 +202,10 @@ fit!(mod_count);
     out = outcome(mod)
     @test out isa DimArray
     @test out == mod.y .* mod.σ_y .+ mod.μ_y
+
+    x = predictors(mod)
+    @test x isa DimArray
+    @test x == mod.X .* mod.σ_X' .+ mod.μ_X'
 end
 
 @testset "Prediction" begin
@@ -230,33 +234,32 @@ end
 @testset "Prediction against GLM" begin
     mod1 = turing_glm(@formula(MPG ~ Cyl + Disp), mtcars, Normal; priors=prior);
     Random.seed!(123)
-    fit!(mod1);
+    fit!(mod1, N=15000);
     mod_glm = GLM.lm(@formula(MPG ~ Cyl + Disp), mtcars);
-    @test isapprox(GLM.coef(mod_glm), parameters(mod1, median)[1:3], atol=0.1)
-    @test isapprox(GLM.predict(mod_glm), predict(mod1, median; type=:epred), atol=0.2)
+    @test isapprox(GLM.coef(mod_glm), parameters(mod1, median; drop_warmup=2000)[1:3], atol=0.025)
+    @test isapprox(GLM.predict(mod_glm), predict(mod1, median; drop_warmup=2000, type=:epred), atol=0.1)
 
     mod2 = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson; priors=prior);
     Random.seed!(123)
-    fit!(mod2);
+    fit!(mod2, N=15000);
     mod2_glm = GLM.glm(@formula(HP ~ Cyl + Disp), mtcars, Poisson(), GLM.LogLink());
-    @test isapprox(GLM.coef(mod2_glm), parameters(mod2, median)[1:3], atol=0.1)
-    @test isapprox(GLM.predict(mod2_glm), predict(mod2, median; type=:epred), atol=2)
+    @test isapprox(GLM.coef(mod2_glm), parameters(mod2, median; drop_warmup=2000)[1:3], atol=0.025)
+    @test isapprox(GLM.predict(mod2_glm), predict(mod2, median; drop_warmup=2000, type=:epred), atol=0.2)
 
     mod3 = turing_glm(@formula(HP ~ Cyl + Disp), mtcars, NegativeBinomial; priors=prior);
     Random.seed!(123)
-    fit!(mod3);
+    fit!(mod3, N=15000);
     mod3_glm = GLM.glm(@formula(HP ~ Cyl + Disp), mtcars, NegativeBinomial(), GLM.LogLink());
-    @test isapprox(GLM.coef(mod3_glm), parameters(mod3, median)[1:3], atol=0.1)
-    @test isapprox(GLM.predict(mod3_glm), predict(mod3, median; type=:epred), atol=2)
+    @test isapprox(GLM.coef(mod3_glm), parameters(mod3, median; drop_warmup=2000)[1:3], atol=0.025)
+    @test isapprox(GLM.predict(mod3_glm), predict(mod3, median; drop_warmup=2000, type=:epred), atol=2)
 
     mtcars.binom = mtcars.MPG .> 20;
     Random.seed!(123)
     mod4 = turing_glm(@formula(binom ~ Cyl + Disp), mtcars, Bernoulli; priors=prior);
-    fit!(mod4);
+    fit!(mod4, N=15000);
     mod4_glm = GLM.glm(@formula(binom ~ Cyl + Disp), mtcars, Binomial(), GLM.LogitLink());
-    @test_broken isapprox(GLM.coef(mod4_glm), parameters(mod4, median)[1:3], atol=0.05)
-    @test_broken isapprox(GLM.coef(mod4_glm), parameters(mod4, median)[1:3], atol=0.1)
-    @test isapprox(GLM.predict(mod4_glm), predict(mod4, median; type=:epred), atol=2)
+    @test_broken isapprox(GLM.coef(mod4_glm), parameters(mod4, median; drop_warmup=2000)[1:3], atol=0.05)
+    @test_broken isapprox(GLM.predict(mod4_glm), predict(mod4, median; drop_warmup=2000, type=:epred), atol=0.05)
 end
 
 @testset "Display Methods" begin
@@ -276,10 +279,6 @@ end
     @test contains(show_output, "32") #Observations
     @test contains(show_output, "8000 samples")
     @test contains(show_output, "4 chains")
-    @test contains(show_output, "Prediction Metrics")
-    @test contains(show_output, "RSquared")
-    @test contains(show_output, "median")
-    @test contains(show_output, "sd")
     # Empty
     @test contains(sprint(show, mod_empty), "empty")
 
@@ -293,6 +292,8 @@ end
             ["median", "std", "q2.5", "q97.5", "mcse", "ess_bulk", "ess_tail"],
         ),
     )
+    @test contains(pretty_output, "Prediction Metrics")
+    @test contains(pretty_output, "RSquared")
     @test all(contains.(Ref(pretty_output), ["Cyl", "Disp"]))
     coef = string.(round.(parent(parameters(mod, median; drop_warmup=0)); digits=2))
     @test all(contains.(Ref(pretty_output), coef))
@@ -314,15 +315,19 @@ end
 @testset "Metrics" begin
     tab = @test_nowarn calculate_metrics(mod, [rsq, rmse]) 
     @test tab isa DimArray
-    @test all(dim(tab, 1) .== ["RSquared", "RootMeanSquaredError"])
+    @test all(dims(tab, 1) .== ["RSquared", "RootMeanSquaredError"])
     tab1b = @test_nowarn default_metrics(mod)
-    @test all(dim(tab1b, 1) .== ["RSquared", "RootMeanSquaredError", "MeanAbsoluteError"])
+    @test all(dims(tab1b, 1) .== ["RSquared", "RootMeanSquaredError", "MeanAbsoluteError"])
 
     # Categorical
     mtcars.binom = mtcars.MPG .> 20;
     mod4 = turing_glm(@formula(binom ~ Cyl + Disp), mtcars, Bernoulli; priors=prior);
+    fit!(mod4);
     tab2 = @test_nowarn calculate_metrics(mod4, [accuracy, kappa])
-    @test all(dim(tab2, 1) .== ["Accuracy", "Kappa"])
-    tab2b = @test_nowarn default_metrics(mod4, [accuracy, kappa])
-    @test all(dim(tab2b, 1) .== ["Accuracy", "Kappa", "TruePositiveRate", "FalsePositiveRate"])
+    @test all(dims(tab2, 1) .== ["Accuracy", "Kappa"])
+    tab2b = @test_nowarn default_metrics(mod4)
+    @test all(dims(tab2b, 1) .== ["Accuracy", "Kappa", "TruePositiveRate", "TrueNegativeRate", "AreaUnderCurve"])
+
+    out = @test_nowarn outcome_as_distribution(mod4)
+    @test out isa UnivariateFinite
 end

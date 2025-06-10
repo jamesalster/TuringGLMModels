@@ -53,7 +53,8 @@ function pretty(
     ncols = length(chain_info)
 
     #metrics
-    metric_tabs = map(f -> default_metrics(TM, f; dropdims=false), funs_all) 
+    drop_warmup = size(TM.samples, 1) < 400 ? 0 : 200
+    metric_tabs = map(f -> default_metrics(TM, f; drop_warmup = drop_warmup, dropdims=false), funs_all) 
     metric_tab = hcat(metric_tabs...)
     metric_tab = set(metric_tab, Dim{:draw} => Dim{:statistic})
     metric_tab = set(metric_tab, Dim{:statistic} => DimensionalData.Dimensions.Categorical)

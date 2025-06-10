@@ -54,6 +54,7 @@ function calculate_metrics(TM::TuringGLMModel{T}, metrics::Vector, fun::Union{No
     else
         # Calculate table
         metric_table = cat(map(metric -> _calculate_metric(metric, preds, y), metrics)...; dims = 1)
+        metrics2 = metrics
     end
 
     #clean names, messy with AUC

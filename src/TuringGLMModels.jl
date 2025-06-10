@@ -41,11 +41,12 @@ export TuringGLMModel,
     fixef,
     internals,
     outcome,
+    predictors,
+    outcome_as_distribution,
     predict,
     psis_loo,
     loo_compare,
     lineribbon,
-    predictors,
     calculate_metrics,
     default_metrics
 
@@ -53,8 +54,8 @@ function __init__()
     #Makie required for band
     @require Makie="ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a" begin
         include("plots/lineribbon.jl")
-        include("plots/plots.jl")
         export lineribbon
+        include("plots/plots.jl")
         export conditional_dependency, pp_check_dens, pp_check_dens_overlay, pp_check_hist
     end
 end
