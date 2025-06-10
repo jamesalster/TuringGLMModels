@@ -128,8 +128,9 @@ pp_check_dens_overlay(mod)
 * `pretty(model)` - Formatted summary
 * `parameter_names(model)` - Parameter names
 * `outcome(model)` - Response variable
+* `outcome_as_distribution(model)` - Response variable as CategoricalDistributions.jl object (Bernoulli only)
 * `predictors(model)` - Predictor table
-* `calculate_metrics(model, metrics)` - Model metrics
+* `calculate_metrics(model, [metrics])` - Model metrics (from StatisticalMeasures.jl)
 * `default_metrics(model)` - Default model metrics
 
 ### Plots

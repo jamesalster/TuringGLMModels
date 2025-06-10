@@ -172,9 +172,13 @@ end
 Get the categorical outcome from the model as a UnivariateFinite distribution from
     `CategoricalDistributions.jl`
 """
-function outcome_as_distribution(TM::TuringGLMModel{T}) where T
+function outcome_as_distribution(TM::TuringGLMModel{T}) where {T}
     if T != Bernoulli
-        throw(ArgumentError("Outcome can only be returned as a UnivariateFinite distribution from a Bernoulli model."))
+        throw(
+            ArgumentError(
+                "Outcome can only be returned as a UnivariateFinite distribution from a Bernoulli model.",
+            ),
+        )
     end
     return Distributions.fit(UnivariateFinite, categorical(TM.y .== 1))
 end

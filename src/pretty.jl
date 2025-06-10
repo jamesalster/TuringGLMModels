@@ -25,7 +25,6 @@ function pretty(
     standardized=false,
     kwargs...,
 )
-
     isnothing(TM.samples) && throw(ArgumentError("Turing Model has not yet been fit!()"))
     sample_obj = standardized ? TM.samples : TM.unstd_params
 
@@ -54,7 +53,9 @@ function pretty(
 
     #metrics
     drop_warmup = size(TM.samples, 1) < 400 ? 0 : 200
-    metric_tabs = map(f -> default_metrics(TM, f; drop_warmup = drop_warmup, dropdims=false), funs_all) 
+    metric_tabs = map(
+        f -> default_metrics(TM, f; drop_warmup=drop_warmup, dropdims=false), funs_all
+    )
     metric_tab = hcat(metric_tabs...)
     metric_tab = set(metric_tab, Dim{:draw} => Dim{:statistic})
     metric_tab = set(metric_tab, Dim{:statistic} => DimensionalData.Dimensions.Categorical)
@@ -77,7 +78,7 @@ function pretty(
             ft_printf("%5.0f", [ncols, ncols - 2, ncols - 3]),
             ft_printf("%5.3f", ncols - 1),
         ),
-        default_options...
+        default_options...,
     )
     pretty_table(
         io,
@@ -87,7 +88,7 @@ function pretty(
         row_labels=Array(dims(metric_tab, 1)),
         row_label_column_title="Metric",
         formatters=(ft_printf("%5.3f")),
-        default_options...
+        default_options...,
     )
     model_warnings(chain_info)
     if return_table
@@ -160,9 +161,9 @@ end
 
 # Default table options
 default_options = (;
-        tf=tf_compact,
-        header_crayon=crayon"bold",
-        row_label_header_crayon=crayon"bold",
-        crop=:horizontal,
-        show_subheader=false,
+    tf=tf_compact,
+    header_crayon=crayon"bold",
+    row_label_header_crayon=crayon"bold",
+    crop=:horizontal,
+    show_subheader=false,
 )
