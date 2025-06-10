@@ -132,25 +132,3 @@ function coefs(TM::TuringGLMModel, fun::Function=median; kwargs...)
     @info "Reducing with function: $(fun)"
     return fixef(TM, fun; kwargs...)
 end
-
-"""
-    outcome(TM::TuringGLMModel; std=false)
-
-Get the response variable as DimArray.
-- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
-"""
-function outcome(TM::TuringGLMModel; std=false)
-    out = std ? TM.y : TM.y .* TM.σ_y .+ TM.μ_y
-    return DimArray(out, (Dim{:row}))
-end
-
-"""
-    predictors(TM::TuringGLMModel; std=false)
-
-Get the predictor matrix variable as DimArray.
-- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
-"""
-function predictors(TM::TuringGLMModel; std=false)
-    out = std ? TM.X : TM.X .* TM.σ_X' .+ TM.μ_X'
-    return DimArray(out, (Dim{:row}, Dim{:var}([TM.X_names...])))
-end

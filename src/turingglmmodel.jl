@@ -143,3 +143,38 @@ function fit!(
     _make_unstd_parameters!(TM)
     return TM
 end
+
+"""
+    outcome(TM::TuringGLMModel; std=false)
+
+Get the response variable as DimArray.
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
+"""
+function outcome(TM::TuringGLMModel; std=false)
+    out = std ? TM.y : TM.y .* TM.σ_y .+ TM.μ_y
+    return DimArray(out, (Dim{:row}))
+end
+
+"""
+    predictors(TM::TuringGLMModel; std=false)
+
+Get the predictor matrix variable as DimArray.
+- `std`: Show standardized coefficients, or scaled back to the original data? Default=false.
+"""
+function predictors(TM::TuringGLMModel; std=false)
+    out = std ? TM.X : TM.X .* TM.σ_X' .+ TM.μ_X'
+    return DimArray(out, (Dim{:row}, Dim{:var}([TM.X_names...])))
+end
+
+"""
+    outcome_as_distribution(TM::TuringGLMModel{Bernoulli})
+
+Get the categorical outcome from the model as a UnivariateFinite distribution from
+    `CategoricalDistributions.jl`
+"""
+function outcome_as_distribution(TM::TuringGLMModel{T}) where T
+    if T != Bernoulli
+        throw(ArgumentError("Outcome can only be returned as a UnivariateFinite distribution from a Bernoulli model."))
+    end
+    return Distributions.fit(UnivariateFinite, categorical(TM.y .== 1))
+end
